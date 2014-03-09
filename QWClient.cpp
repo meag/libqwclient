@@ -21,9 +21,12 @@ along with this program.  If not, see < http://www.gnu.org/licenses/ >.
 #include "QWClientPrivate.h"
 #include <stdio.h>
 
+
+
 QWClient::QWClient():
   myImplementation(new QWClientPrivate(this))
 {
+
 }
 
 void QWClient::connect(const char *host, quint16 port)
@@ -76,6 +79,7 @@ void QWClient::setSpectator(bool spectate)
 	myImplementation->setSpectator(spectate);
 }
 
+
 void QWClient::stripColor(char *string)
 {
 	QWClientPrivate::stripColor(string);
@@ -105,7 +109,7 @@ void QWClient::reconnect()
 const char* QWClient::host() const
 {
   static char host[255];
-  memcpy(host, myImplementation->host().toAscii().data(), myImplementation->host().toAscii().size()+1);
+  memcpy(host, myImplementation->host().toLatin1().data(), myImplementation->host().toLatin1().size()+1);
   return host;
 }
 
