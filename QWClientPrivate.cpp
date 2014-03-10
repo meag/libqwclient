@@ -1051,34 +1051,34 @@ void QWClientPrivate::parseSvcServerinfo()
     myClient->onServerInfo(key.toLatin1().data(), value.toLatin1().data());
 }
 
-void QWClientPrivate::startDownload(const QString &filename)
+void QWClientPrivate::startDownload(const QString &fileName)
 {
-    if(myDownload->isOpen())
+    if (myDownload->isOpen()) {
         myDownload->close();
+        myDownload->remove();
+    }
 
     writeByte(&myReliableOutStream, clc_stringcmd);
-    writeString(&myReliableOutStream, QString("download " + filename));
+    writeString(&myReliableOutStream, QString("download " + fileName));
 
-    if(filename.contains('/'))
-    {
-        QString path = filename.mid(0, (filename.size() - filename.section('/', -1).size() - 1));
+    if (fileName.contains('/')) {
+        QString path = fileName.mid(0, (fileName.size() - fileName.section('/', -1).size() - 1));
         QDir quakeDir(myGameDir);
         quakeDir.mkpath(myQuakeDir + "/" + myGameDir + "/" + path);
     }
 
     //generate disk path
     int tmpNo = 0;
-    QString tmpFileName = myQuakeDir + "/" + myGameDir + "/" + filename + QString::number(tmpNo) + ".tmp";
-    while(myDownload->exists(tmpFileName))
-    {
+    QString tmpFileName = myQuakeDir + "/" + myGameDir + "/" + fileName + QString::number(tmpNo) + ".tmp";
+    while (myDownload->exists(tmpFileName)) {
         tmpNo++;
-        tmpFileName = myQuakeDir + "/" + myGameDir + "/" + filename + QString::number(tmpNo) + ".tmp";
+        tmpFileName = myQuakeDir + "/" + myGameDir + "/" + fileName + QString::number(tmpNo) + ".tmp";
     }
 
     myDownload->setFileName(tmpFileName);
     myDownload->open(QIODevice::WriteOnly);
 
-    myClient->onDownloadStarted(filename.toLatin1().data());
+    myClient->onDownloadStarted(fileName.toLatin1().data());
 }
 
 #if 0
