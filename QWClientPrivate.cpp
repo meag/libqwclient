@@ -226,11 +226,6 @@ void QWClientPrivate::reloadPackFiles()
         delete myPacks.at(i);
     myPacks.clear();
 
-    QDir quakeDir(myQuakeDir);
-
-    if(!quakeDir.isReadable())
-        return;
-
     QDir gameDir(myQuakeDir + "/" + myGameDir);
     if(!gameDir.isReadable())
         return;
