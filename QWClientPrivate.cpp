@@ -125,7 +125,6 @@ void QWClientPrivate::setQuakeFolder(const QString &path)
 {
     myQuakeDir = path;
     QDir dir(myQuakeDir);
-    dir.mkpath("id1");
     dir.mkpath(myGameDir);
     reloadPackFiles();
 }
@@ -219,6 +218,8 @@ QWClientPrivate::~QWClientPrivate()
     delete myDownload;
 }
 
+static QRegExp packRegex("pak[0-9]+\\.pak", Qt::CaseInsensitive);
+
 void QWClientPrivate::reloadPackFiles()
 {
     for(int i = 0; i < myPacks.size(); ++i)
@@ -230,29 +231,10 @@ void QWClientPrivate::reloadPackFiles()
     if(!quakeDir.isReadable())
         return;
 
-    quakeDir.cd("id1");
-
-    QFileInfoList files = quakeDir.entryInfoList(QStringList("*.pak"), QDir::Files);
-    QRegExp packRegex("pak[0-9]+\\.pak", Qt::CaseInsensitive);
-    for(int i = 0; i < files.size(); ++i)
-    {
-        if(packRegex.indexIn(files.at(i).fileName()) != -1)
-        {
-            QWPack* pack = new QWPack();
-            if(!pack->load(files.at(i).absoluteFilePath()))
-            {
-                delete pack;
-                continue;
-            }
-            myPacks.push_back(pack);
-        }
-    }
-    files.clear();
-
     QDir gameDir(myQuakeDir + "/" + myGameDir);
     if(!gameDir.isReadable())
         return;
-    files = gameDir.entryInfoList(QStringList("*.pak"), QDir::Files);
+    QFileInfoList files = gameDir.entryInfoList(QStringList("*.pak"), QDir::Files);
     for(int i = 0; i < files.size(); ++i)
     {
         if(packRegex.indexIn(files.at(i).fileName()) != -1)
