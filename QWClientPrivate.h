@@ -149,7 +149,9 @@ private:
 
 	static unsigned		blockCheckSum(void *buffer, int len);
 	quint32						mapChecksum(const QString& mapName);
-
+    quint32 _mapChecksum;       // checksum we got from error message
+    bool myWrongChecksumFlag;   // for faster reconection
+        
 	//========================================================================
 	// Parsing functions
 	/* Main parsing functions */

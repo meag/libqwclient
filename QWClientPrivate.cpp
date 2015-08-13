@@ -33,6 +33,7 @@ along with this program.  If not, see < http://www.gnu.org/licenses/ >.
 #include <QCryptographicHash>
 #include <QCoreApplication>
 #include <QtEndian>
+#include <QRegExp>
 #include <QDebug>
 
 const char* QWClientPrivate::ClientName		= "libqwclient";
@@ -55,7 +56,9 @@ QWClientPrivate::QWClientPrivate(QWClient* client):
     myBottomColor(0),
     myName(ClientName),
     mySpectatorFlag(true),
-    myTeam("lqwc")
+    myTeam("lqwc"),
+    _mapChecksum(0),
+    myWrongChecksumFlag(false)
 {
     /* Setup IO streams */
     myInBuffer.setBuffer(&myInData);
@@ -682,12 +685,25 @@ void QWClientPrivate::parseSvcDisconnect()
     mySocket->close();
     myState = QWClient::DisconnectedState;
     myClient->onDisconnect();
+
+    if (myWrongChecksumFlag) {
+        reconnect();
+        myWrongChecksumFlag = false;
+        return;
+    }
 }
 
+static QRegExp mapChecksumRegex("^Map model file does not match \\(maps\\/\\w+\\.bsp\\), -?\\d+ != (-?\\d+)\\/(-?\\d+)\\.");
 void QWClientPrivate::parseSvcPrint()
 {
     quint8	level = readByte();
     QString msg		= readString();
+
+    if (mapChecksumRegex.indexIn(msg) != -1) {
+        _mapChecksum = mapChecksumRegex.capturedTexts().at(1).toInt();
+        myWrongChecksumFlag = true;
+        return;
+    }
     myClient->onPrint(level, msg.toLatin1().data());
 }
 
@@ -699,7 +715,7 @@ void QWClientPrivate::parseSvcCenterPrint()
 void QWClientPrivate::parseSvcStuffText()
 {
     QStringList commands = readString().split("\n");
-
+    
     for(int i = 0; i < commands.size(); ++i)
     {
         QString cmd = commands.at(i);
@@ -1352,7 +1368,7 @@ void QWClientPrivate::parseSvcModellist()
 
     if(!fileExists(myMapName) && !QWTables::getOriginalMapChecksum(myMapName))
     {
-        startDownload(myMapName);
+        preSpawn(_mapChecksum);
         return;
     }
     preSpawn(mapChecksum(myMapName));
@@ -1865,14 +1881,6 @@ void QWClientPrivate::connect(const char *host, quint16 port)
     if(myState != QWClient::DisconnectedState)
         return;
 
-    /* Disabled this, blocking too much, now user is supposed to send the string already resolved. */
-    //	QHostInfo hi = QHostInfo::fromName(host);
-    //	if(hi.error() != QHostInfo::NoError)
-    //	{
-    //		myClient->onError(hi.errorString().toLatin1().data());
-    //		return;
-    //	}
-
     myHost.setAddress(host);
     myPort = port;
 
@@ -1980,37 +1988,13 @@ quint32 QWClientPrivate::mapChecksum(const QString &mapName)
 {
     // Check if this is an original map, if it is we have the checksum table ready
     quint32     checksum = 0;
+
     checksum = QWTables::getOriginalMapChecksum(mapName);
     if(checksum)
         return checksum;
 
-    char*		mapdata;
-    quint64 maplen;
-
-    if(!readFile(mapName, &mapdata, &maplen))
-        return 0;
-    if(!maplen || !mapdata)
-        return 0;
-
-    dheader_t* header;
-    uchar*		 mod_base;
-
-    header = (dheader_t*)mapdata;
-    mod_base = (uchar*)mapdata;
-
-    for(int i = 0; i < HEADER_LUMPS; ++i)
-    {
-        if(i == LUMP_ENTITIES || i == LUMP_VISIBILITY || i == LUMP_LEAFS || i == LUMP_NODES)
-            continue;
-        checksum ^= blockCheckSum(mod_base + header->lumps[i].fileofs, header->lumps[i].filelen);
-    }
-    delete[] mapdata;
-
-    QString	cleanMapName;
-    cleanMapName = mapName.section('/', -1);
-    cleanMapName.chop(4); //strip .bsp
-
-    return Com_TranslateMapChecksum(cleanMapName.toLatin1().data(), checksum);
+    // Try error message checksum >DDDDD
+    return _mapChecksum;
 }
 
 unsigned QWClientPrivate::blockCheckSum(void* buffer, int len)
