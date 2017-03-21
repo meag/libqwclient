@@ -378,6 +378,7 @@ void QWClientPrivate::parseConnectionless()
             connString.append("\\password\\" + myPassword);
         connString.append("\\msg\\1\\noaim\\1\\topcolor\\" + QString::number(myTopColor) + "\\bottomcolor\\" + QString::number(myBottomColor) + "\\w_switch\\2\\b_switch\\2\\*client\\" + myClientName);
         connString.append(" " + myClientVersion + "\\name\\" + myName + "\\team\\" + myTeam + "\\spectator\\" + (mySpectatorFlag ? "1" : "0") + "\\pmodel\\33168\\emodel\\6967\\*z_ext\\383\"");
+        connString.append(QString::asprintf("\n0x%x 0x%x\n", PROTOCOL_VERSION_FTE, FTE_PEXT_FLOATCOORDS));
         myInStream.device()->seek(0);
         sendConnectionless(connString.toLatin1());
         myClient->onConnection();
@@ -579,13 +580,20 @@ bool QWClientPrivate::checkForBadRead(quint8 typeSize)
 
 float QWClientPrivate::readAngle()
 {
-    if(checkForBadRead(1))
-        return -1;
+    if (!(this->myFTEProtocolExtensions & FTE_PEXT_FLOATCOORDS))
+    {
+        if(checkForBadRead(1))
+            return -1;
 
-    quint8 angle;
+        quint8 angle;
 
-    myInStream >> angle;
-    return angle * (360.0f/256);
+        myInStream >> angle;
+        return angle * (360.0f/256);
+    }
+    else
+    {
+        return readAngle16();
+    }
 }
 
 float QWClientPrivate::readAngle16()
@@ -601,13 +609,22 @@ float QWClientPrivate::readAngle16()
 
 float QWClientPrivate::readCoord()
 {
-    if(checkForBadRead(2))
-        return -1;
+    if (! (this->myFTEProtocolExtensions & FTE_PEXT_FLOATCOORDS))
+    {
+        if(checkForBadRead(2))
+            return -1;
 
-    quint16 coord;
+        quint16 coord;
 
-    myInStream >> coord;
-    return coord * (1.0f/8);
+        myInStream >> coord;
+        return coord * (1.0f/8);
+    }
+    else
+    {
+        if(checkForBadRead(4))
+            return -1;
+        return readFloat();
+    }
 }
 
 quint8 QWClientPrivate::readByte()
@@ -770,9 +787,14 @@ void QWClientPrivate::parseSvcServerData()
 {
     while (1) {
         myProtocolVersion = readLong();
-        if(myProtocolVersion == PROTOCOL_VERSION_FTE || myProtocolVersion == PROTOCOL_VERSION_FTE2)
+        if(myProtocolVersion == PROTOCOL_VERSION_FTE)
         {
             myFTEProtocolExtensions = readLong();
+            continue;
+        }
+        if (myProtocolVersion == PROTOCOL_VERSION_FTE2)
+        {
+            myFTEProtocolExtensions2 = readLong();
             continue;
         }
         if(myProtocolVersion == PROTOCOL_VERSION)
